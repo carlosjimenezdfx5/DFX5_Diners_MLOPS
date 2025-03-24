@@ -1,0 +1,92 @@
+# Project definition for testops_tools package.
+#
+#Copyright 2025 DFX5.
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the License.
+
+[tool.poetry]
+name = "testops-tools"
+version = "0.1.0"
+description = "TestOps tools engine"
+authors = ["Carlos Daniel Jiménez Martínez <daniel.jimenez@dfx5.com>"]
+license = "Other/Proprietary"
+readme = "README.md"
+packages = [{include = "testops_tools", from = "src" }]
+repository = ""
+homepage = ""
+keywords = ["testops", "rct", "synthetic_control"]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Science/Research',
+    'Intended Audience :: Developers',
+    'Programming Language :: C',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Topic :: Data Science',
+    'Topic :: Scientific/Engineering',
+    'Typing :: Typed',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+]
+
+
+[tool.poetry.urls]
+homepage = ""
+documentation = ""
+source = ""
+download = ""
+
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+pandas = "1.2.5"
+statsmodels = "^0.14.0"
+scikit-learn = "^1.3.0"
+scipy = "1.9.3"
+numba = "^0.58.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.0"
+requests-mock = "^1.11.0"
+pytest-dotenv = "^0.5.2"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.11.1"
+pytest-timeout = "^2.1.0"
+pytest-xdist = "^3.3.1"
+pytest-benchmark = "^4.0.0"
+
+[tool.poetry.group.build.dependencies]
+wheel = "^0.40.0"
+setuptools = "^68.0.0"
+
+[tool.poetry.group.as_engine.dependencies]
+matplotlib = "^3.7.2"
+plotly = "^5.15.0"
+seaborn = "^0.12.2"
+toolz = "^0.12.0"
+dtaidistance = "^2.3.10"
+hyperopt = "^0.2.7"
+pyspark = "^3.5.0"
+pyarrow = "^14.0.1"
+numpy = "1.23.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+build_submodule = "src.submodules_builder:run"
+

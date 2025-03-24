@@ -1,0 +1,645 @@
+
+name: CD:some test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/testops_tools/**'
+  workflow_dispatch:
+
+
+env:
+  WORKING_DIR: .
+  APP_NAME: example_testops_tools
+  REGISTRY_NAME: abiapi1
+  
+  AWS_CREDENTIALS: ${{ secrets.AWS_CREDENTIALS }}
+  
+  NAMESPACE: testops-lab
+  TARGET_COMPONENTS: | # Examples
+    ("power_calculator"
+     "random_control_trial_2"
+     "sample_size_estimation",
+     "outliers_treatment"
+    )
+  PYTHON_VERSION: 3.11.0
+  REPORTS_PATH: /home/runner/work/global-test-learn-platform-ds/global-test-learn-platform-ds/reports
+
+
+jobs:
+  build_unit_test_env:
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+    strategy:
+      matrix:
+        build_tag: [ b_unitary_ ]
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        printf "INFO: Configuring build_tag: ${{ matrix.build_tag }} \n"
+        # First, declare build_target hashmap
+        declare -A build_targets
+        build_targets=( ["b_unitary_"]="testops_tools_engine_unit_test" )
+        # Configure current build_target, based on current build_tag
+        build_tag=${{ matrix.build_tag }}
+        build_target="${build_targets[$build_tag]}"
+        printf "INFO: Current build_target: ${build_target} \n"
+        echo "BUILD_TARGET=${build_target}" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Build and push beta-production testops_tools image
+      id: build_and_push_b_base_image
+      uses: ./.github/actions/build_push_docker_image
+      with:
+          REGISTRY_NAME: ${{ env.REGISTRY_NAME }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          WORKING_DIR: ${{ env.WORKING_DIR }}
+          BUILD_TAG: ${{ matrix.build_tag }}
+          BUILD_TARGET: ${{ env.BUILD_TARGET }}
+          JFROG_CONNECTION_STRING: ${{ secrets.JFROG_CONNECTION_STRING }}
+          APP_NAME: ${{ env.APP_NAME }}
+
+
+  build_integration_with_container:
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+    strategy:
+      matrix:
+        target_component: [pc.json, sse.json, olt.json, rct.json]
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        echo Set current version
+        echo "PACKAGE_NAME=${{ matrix.target_component }}" >> $GITHUB_ENV
+        temp=${{ matrix.target_component }}
+        _artifact_name="${temp%.json}"
+        echo "COMPONENT_NAME=${_artifact_name}" >> $GITHUB_ENV
+        echo "PACKAGE_VERSION=b_$(sed -n '1p' version)" >> $GITHUB_ENV
+    - name: Check env
+      id: check_env_variables
+      run : |
+        env
+        echo "Content of GITHUB_ENV:"
+        cat $GITHUB_ENV
+      shell: bash
+
+    - name: 'Configure test suite environment'
+      id: configure_env
+      run: |
+        # Create .env file
+        touch $PWD/.env
+        echo PACKAGE_NAME='${{ matrix.target_component }}' >> $PWD/.env
+        echo PACK_VERSION='1.0' >> $PWD/.env
+        echo "   .env content: $(cat $PWD/.env)"
+      shell: bash
+
+    # Upload /configs folder
+    - uses: actions/upload-artifact@v3
+      with:
+        name: configs-artifact
+        path: $PWD
+        retention-days: 1
+
+          #    - name: Build and push beta-integration_test_on_container
+          #      id: build_and_push_b_integration_test_on_container
+          #      uses: ./.github/actions/build_push_docker_image
+          #      with:
+          #          REGISTRY_NAME: ${{ env.REGISTRY_NAME }}
+          #          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          #          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          #          WORKING_DIR: ${{ env.WORKING_DIR }}
+          #          BUILD_TAG: 'b_integration_on_container_${{ env.COMPONENT_NAME }}_'
+          #          BUILD_TARGET: component_integration_test_on_container
+          #          JFROG_CONNECTION_STRING: ${{ secrets.JFROG_CONNECTION_STRING }}
+          #          APP_NAME: ${{ env.APP_NAME }}
+          #          PACKAGE_CONFIG: ${{ matrix.target_component }}
+          #          PACKAGE_VERSION: '1.0'
+
+
+  build_integration_with_api:
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+    strategy:
+      matrix:
+        target_component: [pc.json, sse.json, rct.json]
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        echo Set current version
+        echo "PACKAGE_NAME=${{ matrix.target_component }}" >> $GITHUB_ENV
+        temp=${{ matrix.target_component }}
+        _artifact_name="${temp%.json}"
+        echo "COMPONENT_NAME=${_artifact_name}" >> $GITHUB_ENV
+        echo "PACKAGE_VERSION=b_$(sed -n '1p' version)" >> $GITHUB_ENV
+    - name: Check env
+      id: check_env_variables
+      run : |
+        env
+        echo "Content of GITHUB_ENV:"
+        cat $GITHUB_ENV
+      shell: bash
+
+    - name: 'Configure test suite environment'
+      id: configure_env
+      run: |
+        # Create .env file
+        touch $PWD/.env
+        echo PACKAGE_NAME='${{ matrix.target_component }}' >> $PWD/.env
+        echo PACK_VERSION='0.6.6.6' >> $PWD/.env
+        echo "   .env content: $(cat $PWD/.env)"
+      shell: bash
+
+    # Upload /configs folder
+#    - uses: actions/upload-artifact@v3
+#      with:
+#        name: configs-artifact
+#        path: $PWD
+#        retention-days: 1
+#
+#    - name: Install poetry
+#      id: install_poetry
+#      run : |
+#        printf "INFO: Installing poetry:\n"
+#        curl -sSL https://install.python-poetry.org | python3 -
+#        which poetry
+#        poetry --version
+#      shell: bash
+#
+#    - name: Build submodules
+#      id: build_submodules
+#      run : |
+#        printf "INFO: Building submodules: \n"
+#        cd packages/testops_tools/
+#        pwd
+#        poetry install --only build
+#        poetry run build_submodule bdist_wheel clean --all --config_path src/submodules_config/${{ matrix.target_component }} --version 1.0
+#        printf "INFO: Built and available submodules: \n"
+#        ls dist/
+#        echo "CURRENT_SUBMODULE=$(ls dist/)" >> $GITHUB_ENV
+#      shell: bash
+#
+#    - uses: actions/upload-artifact@v3
+#      with:
+#        name: testops_tools_submodules
+#        path: packages/testops_tools/dist
+
+#    - name: Copy submodules to API folder
+#      id: copying_submodules
+#      run : |
+#        printf "INFO: Copying submodules to API folder"
+#        cd packages/
+#        cp testops_tools/dist/* API/${{ env.COMPONENT_NAME }}-api
+#        printf "INFO: Available submodules on API folder:"
+#        ls API/${{ env.COMPONENT_NAME }}-api
+#      shell: bash
+
+        #    - name: Build and push integration on api for deployment
+        #      id: build_and_push_integration_on_api_for_deployment
+        #      uses: ./.github/actions/build_push_docker_image
+        #      with:
+        #          REGISTRY_NAME: ${{ env.REGISTRY_NAME }}
+        #          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+        #          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        #          WORKING_DIR: packages/API/${{ env.COMPONENT_NAME }}-api
+        #          BUILD_TAG: 'b_integration_deployment_on_api_${{ env.COMPONENT_NAME }}_'
+        #          BUILD_TARGET: production
+        #          APP_NAME: ${{ env.APP_NAME }}
+        #          LOCAL_PACKAGE: ${{ env.CURRENT_SUBMODULE }}
+        #
+        #    - name: Build and push integration on api image
+        #      id: build_and_push_integration_on_api_image
+        #      uses: ./.github/actions/build_push_docker_image
+        #      with:
+        #          REGISTRY_NAME: ${{ env.REGISTRY_NAME }}
+        #          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+        #          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        #          WORKING_DIR: packages/API/${{ env.COMPONENT_NAME }}-api
+        #          BUILD_TAG: 'b_integration_test_on_api_${{ env.COMPONENT_NAME }}_'
+        #          BUILD_TARGET: integration_test
+        #          APP_NAME: ${{ env.COMPONENT_NAME }}-api
+        #          LOCAL_PACKAGE: ${{ env.CURRENT_SUBMODULE }}
+
+
+  deploy_integration_with_api:
+    needs: [  build_integration_with_api ]
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+    strategy:
+      matrix:
+        target_component: [pc.json, sse.json, rct.json]
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        echo Set current version
+        echo "PACKAGE_NAME=${{ matrix.target_component }}" >> $GITHUB_ENV
+        temp=${{ matrix.target_component }}
+        _artifact_name="${temp%.json}"
+        echo "COMPONENT_NAME=${_artifact_name}" >> $GITHUB_ENV
+        echo "PACKAGE_VERSION=b_$(sed -n '1p' version)" >> $GITHUB_ENV
+    - name: Set INTEGRATION_ON_API_CONTAINER
+      id: set_INTEGRATION_ON_API_CONTAINER
+      run : |
+        echo "INTEGRATION_ON_API_CONTAINER=b_integration_deployment_on_api_${{ env.COMPONENT_NAME }}_$(sed -n '1p' version)" >> $GITHUB_ENV
+    - name: Print env
+      id: show_version
+      run : |
+        printf "INFO: Current version: \n"
+        echo $INTEGRATION_ON_API_CONTAINER
+#    - name: Set the target AWS Kubernetes Service (AKS) cluster
+#      uses: AWS/aks-set-context@v1
+#      with:
+#        creds: '${{ env.AWS_CREDENTIALS }}'
+#        resource-group: ${{ secrets.RESOURCE_GROUP }}
+#        cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+          #    - name: Deploy app to testops-lab namespace
+          #      uses: AWS/k8s-deploy@v4
+          #      with:
+          #        manifests: |
+          #          ${{ github.workspace }}/packages/API/${{ env.COMPONENT_NAME }}-api/kubernetes/dev/beta_build
+          #        images:
+          #          ${{ secrets.AWS_CONTAINER_REGISTRY_NAME }}.AWScr.io/${{ env.APP_NAME }}:${{ env.INTEGRATION_ON_API_CONTAINER }}
+          #        namespace: testops-lab
+          #
+
+  running_unit_test:
+    needs: [ build_unit_test_env, build_integration_with_container, deploy_integration_with_api ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9.19"]
+    environment:
+      name: test-suite
+    steps:
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+          python-version: ${{ matrix.python-version }}
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        echo Set current version
+        echo "PACKAGE_VERSION=$(sed -n '1p' version)" >> $GITHUB_ENV
+        echo "UNIT_TEST_CONTAINER=b_unitary_$(sed -n '1p' version)" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Check env
+      id: check_env_variables
+      run : |
+        env
+        echo "Content of GITHUB_ENV:"
+        cat $GITHUB_ENV
+      shell: bash
+
+    - name: Configure test suite environment
+      id: configure_env
+      run: |
+        # Create .env file
+        touch $PWD/.env
+        echo PACKAGE_VERSION=r"${{ env.PACKAGE_VERSION }}" >> $PWD/.env
+        echo "   .env content: $(cat $PWD/.env)"
+      shell: bash
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: configs-artifact
+        path: $PWD
+        retention-days: 1
+
+    - name: Run unit test
+      id: run_unit_test
+      uses: ./.github/actions/run_test_suite
+      with:
+          PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
+          WORKING_DIR: $PWD #${{ env.WORKING_DIR }}
+          BUILD_PATH: $PWD  #${{ env.BUILD_PATH  }}
+          CONFIGS_PATH: $PWD  #${{ env.CONFIGS_PATH  }}
+          PORT: 8000
+          JFROG_CONNECTION_STRING: ${{ secrets.JFROG_CONNECTION_STRING }}
+          REGISTRY_NAME: ${{ secrets.REGISTRY_NAME }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          REPOSITORY_NAME: testops_tools
+          IMAGE_TAG: ${{ env.UNIT_TEST_CONTAINER }}
+
+#    - name: Run unit test_for_coverage
+#      id: run_unit_test_for_coverage
+#      uses: ./.github/actions/run_test_suite
+#      with:
+#          PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
+#          WORKING_DIR: $PWD #${{ env.WORKING_DIR }}
+#          BUILD_PATH: $PWD  #${{ env.BUILD_PATH  }}
+#          CONFIGS_PATH: $PWD  #${{ env.CONFIGS_PATH  }}
+#          PORT: 8000
+#          JFROG_CONNECTION_STRING: ${{ secrets.JFROG_CONNECTION_STRING }}
+#          REGISTRY_NAME: ${{ secrets.REGISTRY_NAME }}
+#          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+#          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+#          REPOSITORY_NAME: testops_tools
+#          IMAGE_TAG: ${{ env.UNIT_TEST_CONTAINER_COVERAGE }}
+
+
+  sonarcloud:
+    needs:
+      - running_unit_test
+    name: sonarcloud
+    environment:
+      name: test-suite
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: List artifacts
+        id: list
+        uses: yakubique/list-artifacts@v1.1
+        with:
+          name: test-*
+
+      - uses: actions/download-artifact@v4
+        with:
+          name:  test-coverage
+          path: ${{ github.workspace }}/reports
+          if-no-files-found: error
+      - name: 'Check configs path folder'
+        id: configure_env
+        run: |
+          mv -v ${{ env.REPORTS_PATH }}/coverage-${{ env.PYTHON_VERSION }}.xml ${{ env.REPORTS_PATH }}/coverage.xml
+          ls -la ${{ env.REPORTS_PATH }}
+          cp ${{ env.REPORTS_PATH }}/coverage.xml ${{ github.workspace }}/src/coverage.xml
+          head -40 ${{ github.workspace }}/src/coverage.xml
+        shell: bash
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: ${{ github.workspace }}/src/
+          args: >
+            -Dsonar.organization=ab-inbev-analytics
+            -Dsonar.projectKey=ab-inbev-analytics_global-test-learn-platform-ds
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.python.xunit.reportPath=coverage.xml
+            -Dsonar.python.version=${{ env.PYTHON_VERSION }}
+            -Dsonar.test.exclusions=tests/**
+            -Dsonar.coverage.exclusions=tests/**
+            -Dsonar.links.homepage=https://github.com/ab-inbev-analytics/global-test-learn-platform-ds
+            -Dsonar.verbose=true
+            
+
+  running_integration_with_container:
+    needs: [ running_unit_test ]
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+    strategy:
+      matrix:
+        target_component: [pc.json, sse.json]
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        echo Set current version
+        echo "PACKAGE_NAME=${{ matrix.target_component }}" >> $GITHUB_ENV
+        temp=${{ matrix.target_component }}
+        _artifact_name="${temp%.json}"
+        echo "COMPONENT_NAME=${_artifact_name}" >> $GITHUB_ENV
+        echo "PACKAGE_VERSION=$(sed -n '1p' version)" >> $GITHUB_ENV
+    - name: Set CONTAINER_INTEGRATION_TEST_EXECUTION
+      id: set_CONTAINER_INTEGRATION_TEST_EXECUTION
+      run : |
+        echo Set proper integration test execution
+        echo "CONTAINER_INTEGRATION_TEST_EXECUTION=b_integration_on_container_${{ env.COMPONENT_NAME }}_${{ env.PACKAGE_VERSION }}" >> $GITHUB_ENV
+    - name: Check env
+      id: check_env_variables
+      run : |
+        env
+        echo "Content of GITHUB_ENV:"
+        echo ${{ env.PACKAGE_NAME }}
+        echo ${{ env.COMPONENT_NAME }}
+        echo ${{ env.CONTAINER_INTEGRATION_TEST_EXECUTION }}
+      shell: bash
+
+    - name: Configure test suite environment
+      id: configure_env
+      run: |
+        # Create .env file
+        touch $PWD/.env
+        echo PACKAGE_NAME="${{ matrix.target_component }}" >> $PWD/.env
+        echo PACK_VERSION="${{ env.PACKAGE_VERSION }}" >> $PWD/.env
+        echo "   .env content: $(cat $PWD/.env)"
+      shell: bash
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: configs-artifact
+        path: ${{ env.REPORTS_PATH }}
+        retention-days: 1
+
+
+
+  running_integration_with_api:
+    env:
+        K8S_NAMESPACE: 'testops-lab'
+    needs: [ running_unit_test ]
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+    strategy:
+      matrix:
+        target_component: [pc.json, sse.json, rct.json]
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Cancel previous jobs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Set env
+      id: set_env_variables
+      run : |
+        echo Set current version
+        echo "PACKAGE_NAME=${{ matrix.target_component }}" >> $GITHUB_ENV
+        temp=${{ matrix.target_component }}
+        _artifact_name="${temp%.json}"
+        echo "COMPONENT_NAME=${_artifact_name}" >> $GITHUB_ENV
+        echo "PACKAGE_VERSION=$(sed -n '1p' version)" >> $GITHUB_ENV
+        _KEY_SECRET_NAME="${_artifact_name^^}"
+        echo "KEY_SECRET_NAME=${_KEY_SECRET_NAME}" >> $GITHUB_ENV
+    - name: Set CONTAINER_INTEGRATION_TEST_EXECUTION
+      id: set_CONTAINER_INTEGRATION_TEST_EXECUTION
+      run : |
+        echo Set current version
+        echo "CONTAINER_INTEGRATION_TEST_EXECUTION=b_integration_test_on_api_${{ env.COMPONENT_NAME }}_${{ env.PACKAGE_VERSION }}" >> $GITHUB_ENV
+        echo "ENGINE_INTEGRATION_TEST_URL=${{ env.KEY_SECRET_NAME }}-ENGINE-INTEGRATION-TEST-URL" >> $GITHUB_ENV
+    - name: Check env
+      id: check_env_variables
+      run : |
+        echo "Content of GITHUB_ENV:"
+        printf "INFO: PACKAGE_NAME=${{ env.PACKAGE_NAME }}\n"
+        printf "INFO: COMPONENT_NAME=${{ env.COMPONENT_NAME }}\n"
+        printf "INFO: CONTAINER FOR INTEGRATION TEST EXECUTION=${{ env.CONTAINER_INTEGRATION_TEST_EXECUTION }}\n"
+        printf "INFO: ENGINE_INTEGRATION_TEST_URL=${{ env.ENGINE_INTEGRATION_TEST_URL }}\n"
+      shell: bash
+
+    - name: Retrieve secrets
+      id: retrieve_akv_secrets
+      uses: ./.github/actions/retrieve_akv_secrets
+      with:
+        AWS_CREDENTIALS: ${{ secrets.AWS_CREDENTIALS }}
+        AWS_KEY_VAULT_INSTANCE: ${{ secrets.AWS_KEY_VAULT_NAME }}
+        SECRETS: TESTOPS-INSTRUMENTATION-KEY JFROG-CONNECTION-STRING ACR-USER-TESTOPS ACR-PASSWORD-TESTOPS TESTOPS-AUTH-ALGORITHM TESTOPS-AUTH-SECRET
+      
+
+
+  cleanup_test_environment:
+    env:
+        K8S_NAMESPACE: 'testops-lab'
+    needs: [ running_integration_with_api, running_integration_with_container ]
+    runs-on: ubuntu-latest
+    environment:
+      name: test-suite
+
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+
+
+  deploy_testops_tools_package:
+    needs: [ sonarcloud, cleanup_test_environment ]
+    runs-on: ubuntu-latest
+    environment:
+      name: testops_tools-dev
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Retrieve secrets
+      id: retrieve_akv_secrets
+      uses: ./.github/actions/retrieve_akv_secrets
+      with:
+          AWS_CREDENTIALS: ${{ secrets.AWS_CREDENTIALS }}
+          AWS_KEY_VAULT_INSTANCE: ${{ secrets.AWS_KEY_VAULT_NAME }}
+          SECRETS: LH-JFROG-API-KEY LH-JFROG-USERNAME JFROG-ARTIFACTORY-URL
+
+    - name: Configure package build environment
+      id: configure_build_environment
+      run: |
+        repo_name='abia-local-light-house'
+        build_name=${repo_name//_/-}
+        echo "package_name=$build_name" >> $GITHUB_ENV
+        echo PACKAGE_VERSION=$(head -n 1 version) >> $GITHUB_ENV
+        echo BUILD_TAG='beta' >> $GITHUB_ENV
+        #echo "build_name: "$build_name
+        echo JFROG_PUSH_REPOSITORY='abia-local-light-house/testops_tools' >> $GITHUB_ENV
+        echo JFROG_ARTIFACTORY_URL='${{env.JFROG-ARTIFACTORY-URL}}' >> $GITHUB_ENV
+        echo JFROG_USERNAME='${{env.LH-JFROG-USERNAME}}' >> $GITHUB_ENV
+        echo JFROG_API_KEY='${{env.LH-JFROG-API-KEY}}' >> $GITHUB_ENV
+      shell: bash
+
+    - name: Display variables
+      run: |
+        printf "INFO: Push repository: ${{ env.JFROG_PUSH_REPOSITORY}} \n"
+        printf "INFO: Build name: ${{steps.configure_build_environment.outputs.package_name }} \n"
+        printf "INFO: Build Tag: ${{ env.BUILD_TAG }} \n"
+        printf "INFO: Build version: ${{ env.PACKAGE_VERSION }} \n"
+      shell: bash
+
+    - name: Append JFROG Credentials in netrc file
+      uses: extractions/netrc@v1
+      with:
+        machine: abinbev.jfrog.io
+        username: ${{ env.JFROG_USERNAME }}
+        password: ${{ env.JFROG_API_KEY }}
+
+    - name: Install poetry
+      id: install_poetry
+      run : |
+        printf "INFO: Installing poetry:\n"
+        curl -sSL https://install.python-poetry.org | python3 -
+        which poetry
+        poetry --version
+      shell: bash
+
+    - name: Build testops_tools package
+      id: build_package
+      run : |
+        printf "INFO: Building testops_tools package: \n"
+        # Fixing package version - as toml doesn't support environment vars...
+        sed -i -e "s/.*version.*/version=\"${{ env.PACKAGE_VERSION }}\"/g" pyproject.toml
+        poetry install --only build
+        poetry build
+        ls dist/
+      shell: bash
+
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v1
