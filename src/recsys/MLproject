@@ -1,0 +1,19 @@
+name: product-mix-recs
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      train_data: {type: str, default: "<TRAIN_DATA_PATH>"}
+      numerical_features: {type: str, default: "<NUM_FEATURE_1> <NUM_FEATURE_2>"}
+      categorical_features: {type: str, default: "<CAT_FEATURE_1> <CAT_FEATURE_2>"}
+      target: {type: str, default: "<TARGET_COLUMN>"}
+      epochs: {type: int, default: 50}
+    command: >
+      python train.py
+      --train-data {train_data}
+      --numerical-features {numerical_features}
+      --categorical-features {categorical_features}
+      --target {target}
+      --epochs {epochs}

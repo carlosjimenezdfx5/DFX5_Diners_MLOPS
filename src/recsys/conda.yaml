@@ -1,0 +1,17 @@
+name: product-mix-env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - pip= 25.0.1
+  - pip:
+      - numpy
+      - pandas
+      - scikit-learn
+      - imblearn
+      - matplotlib
+      - seaborn
+      - tensorflow
+      - keras-tuner
+      - mlflow
+      - uvicorn
