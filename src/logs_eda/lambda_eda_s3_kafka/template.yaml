@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM Template - Lambda triggered by MSK to run EDA on CSV from S3
+
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 1024
+    Runtime: python3.9
+    Architectures:
+      - x86_64
+
+Resources:
+
+  KafkaToS3Lambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: KafkaToS3Lambda
+      Handler: eda_kafka_pipeline.lambda_handler
+      CodeUri: ./src
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonMSKReadOnlyAccess
+        - S3FullAccessPolicy
+      Events:
+        KafkaTrigger:
+          Type: MSK
+          Properties:
+            Stream: !Sub arn:aws:kafka:us-east-2:${AWS::AccountId}:cluster/eda-kafka-cluster/*
+            StartingPosition: LATEST
+            Topics:
+              - logs-eda-topic
+            BatchSize: 1
+            Enabled: true
+
+  S3FullAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: S3FullAccessPolicyForEDA
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+            Resource: '*'
+
+Outputs:
+  KafkaLambdaFunction:
+    Description: "Lambda Function consuming from MSK and performing EDA"
+    Value: !GetAtt KafkaToS3Lambda.Arn
